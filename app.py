@@ -1,9 +1,8 @@
-ffrom flask import Flask, request
+from flask import Flask, request
 import mysql.connector
 import os
 from dotenv import load_dotenv
 
-# load .env file
 load_dotenv()
 
 app = Flask(__name__)
@@ -28,20 +27,30 @@ def home():
 
 @app.route('/register', methods=['POST'])
 def register():
-    username = request.form['username']
-    password = request.form['password']
+    db = None
+    cursor = None
 
-    db = get_db()
-    cursor = db.cursor()
+    try:
+        username = request.form['username']
+        password = request.form['password']
 
-    sql = "INSERT INTO users(username, password) VALUES (%s, %s)"
-    cursor.execute(sql, (username, password))
-    db.commit()
+        db = get_db()
+        cursor = db.cursor()
 
-    cursor.close()
-    db.close()
+        sql = "INSERT INTO users(username, password) VALUES (%s, %s)"
+        cursor.execute(sql, (username, password))
+        db.commit()
 
-    return "Data stored successfully"
+        return "Data stored successfully"
+
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+    finally:
+        if cursor:
+            cursor.close()
+        if db:
+            db.close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
