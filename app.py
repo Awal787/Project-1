@@ -1,29 +1,29 @@
-from flask import Flask, request
+from flask import Flask, request, render_template
 import mysql.connector
 import os
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash
 
 load_dotenv()
 
 app = Flask(__name__)
 
 def get_db():
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASS"),
-        database=os.getenv("DB_NAME")
-    )
+    try:
+        return mysql.connector.connect(
+            host=os.getenv("DB_HOST"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASS"),
+            database=os.getenv("DB_NAME"),
+            connection_timeout=10
+        )
+    except Exception as e:
+        print("DB connection error:", e)
+        return None
 
 @app.route('/')
 def home():
-    return '''
-    <form method="POST" action="/register">
-    Username:<input name="username"><br>
-    Password:<input name="password"><br>
-    <input type="submit">
-    </form>
-    '''
+    return render_template("index.html")
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -31,20 +31,46 @@ def register():
     cursor = None
 
     try:
-        username = request.form['username']
-        password = request.form['password']
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        # validation
+        if not username or not password:
+            return render_template(
+                "index.html",
+                message="⚠️ Username and password cannot be empty",
+                status="error"
+            )
+
+        # hash password (important)
+        hashed_password = generate_password_hash(password)
 
         db = get_db()
+        if db is None:
+            return render_template(
+                "index.html",
+                message="❌ Database connection failed",
+                status="error"
+            )
+
         cursor = db.cursor()
 
         sql = "INSERT INTO users(username, password) VALUES (%s, %s)"
-        cursor.execute(sql, (username, password))
+        cursor.execute(sql, (username, hashed_password))
         db.commit()
 
-        return "Data stored successfully"
+        return render_template(
+            "index.html",
+            message="✅ User added successfully!",
+            status="success"
+        )
 
     except Exception as e:
-        return f"Error: {str(e)}"
+        return render_template(
+            "index.html",
+            message=f"❌ Error: {str(e)}",
+            status="error"
+        )
 
     finally:
         if cursor:
